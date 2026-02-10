@@ -15,12 +15,11 @@ REGLAS DE COMPORTAMIENTO:
 7. Saluda de manera cercana y haz preguntas suaves para continuar la conversación.
 8. No juzgues al usuario; bríndale consuelo y esperanza.
 
-Cada respuesta debe ser enriquecedora espiritualmente.
+Cada respuesta debe ser enriquecedora espiritualmente. Responde en español.
 `;
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-
 export async function getInitialQuote() {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: 'Genera un versículo bíblico corto y reconfortante en español, indicando libro, capítulo y versículo. Devuelve solo el versículo y la referencia en una sola línea separada por un guión.',
@@ -36,8 +35,9 @@ export async function getInitialQuote() {
 }
 
 export function createChatSession() {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   return ai.chats.create({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-3-flash-preview',
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
       temperature: 0.7,
@@ -46,19 +46,24 @@ export function createChatSession() {
 }
 
 export async function generateSpeech(text: string): Promise<string> {
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-preview-tts",
-    contents: [{ parts: [{ text: `Lee con voz solemne, calmada y espiritual el siguiente mensaje bíblico: ${text}` }] }],
-    config: {
-      responseModalities: [Modality.AUDIO],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: 'Kore' }, // Kore has a deep, mature tone suitable for this app
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: `Lee con voz solemne y calmada: ${text}` }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
+          },
         },
       },
-    },
-  });
+    });
 
-  const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  return base64Audio || '';
+    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
+  } catch (error) {
+    console.error("Error generating speech:", error);
+    return '';
+  }
 }
