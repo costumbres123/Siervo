@@ -9,52 +9,66 @@ const ChatInterface: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const chatSessionRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    chatSessionRef.current = createChatSession();
-    // Bienvenida
-    const welcomeText = 'Bienvenido, amado hermano. Soy tu Siervo de Dios. ¿Qué inquietud o texto bíblico deseas que escudriñemos hoy juntos?';
-    
-    const initWelcome = async () => {
+  const initSession = async () => {
+    setHasError(false);
+    setIsLoading(true);
+    try {
+      chatSessionRef.current = createChatSession();
+      const welcomeText = 'Bienvenido, amado hermano. Soy tu Siervo de Dios. ¿Qué inquietud o texto bíblico deseas que escudriñemos hoy juntos?';
       const audio = await generateSpeech(welcomeText);
+      
       setMessages([{
         role: 'model',
         text: welcomeText,
         audioBase64: audio,
         timestamp: Date.now()
       }]);
-    };
-    
-    initWelcome();
+    } catch (err) {
+      console.error("Error initializing session:", err);
+      setHasError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    initSession();
   }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isLoading]);
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!inputText.trim() || isLoading) return;
+    const textToSend = inputText.trim();
+    if (!textToSend || isLoading) return;
 
     const userMessage: Message = {
       role: 'user',
-      text: inputText,
+      text: textToSend,
       timestamp: Date.now()
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsLoading(true);
+    setHasError(false);
 
     try {
-      const response = await chatSessionRef.current.sendMessage({ message: userMessage.text });
-      const modelText = response.text;
+      if (!chatSessionRef.current) {
+        chatSessionRef.current = createChatSession();
+      }
+
+      const response = await chatSessionRef.current.sendMessage({ message: textToSend });
+      const modelText = response.text || "No he podido recibir la palabra en este momento.";
       
-      // Generar audio para cada respuesta
       const audioBase64 = await generateSpeech(modelText);
 
       const modelMessage: Message = {
@@ -65,11 +79,12 @@ const ChatInterface: React.FC = () => {
       };
 
       setMessages(prev => [...prev, modelMessage]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error en la comunicación:", error);
+      setHasError(true);
       const errorMessage: Message = {
         role: 'model',
-        text: "Hermanito, he tenido una pequeña dificultad técnica. Intentemos de nuevo, con el favor de Dios.",
+        text: "Hermanito, ha ocurrido un obstáculo en nuestra conexión. Por favor, asegúrate de que la clave de API sea válida o intenta de nuevo en unos momentos.",
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -79,7 +94,7 @@ const ChatInterface: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-black">
+    <div className="flex flex-col h-screen bg-[#050505]">
       {/* Header */}
       <header className="p-4 border-b border-[#D4AF37]/20 flex justify-between items-center bg-[#0a0a0a] sticky top-0 z-10">
         <div className="flex items-center space-x-3">
@@ -90,25 +105,21 @@ const ChatInterface: React.FC = () => {
           </div>
           <div>
             <h1 className="font-serif gold-text text-xl font-bold tracking-wider leading-none">Siervo de Dios</h1>
-            <span className="text-[9px] uppercase tracking-tighter text-gray-500 font-bold">Acompañamiento Espiritual</span>
+            <span className="text-[9px] uppercase tracking-tighter text-gray-500 font-bold">Luz en tu camino</span>
           </div>
         </div>
 
         <button 
           onClick={() => setIsVoiceEnabled(!isVoiceEnabled)}
           className={`flex items-center space-x-2 px-3 py-1.5 rounded-full border transition-all ${
-            isVoiceEnabled ? 'gold-border gold-text bg-white/5' : 'border-gray-800 text-gray-500'
+            isVoiceEnabled ? 'gold-border gold-text bg-[#D4AF37]/10' : 'border-gray-800 text-gray-500'
           }`}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {isVoiceEnabled ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-            )}
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
           </svg>
-          <span className="text-xs font-bold uppercase tracking-widest">
-            {isVoiceEnabled ? 'Voz On' : 'Voz Off'}
+          <span className="text-[10px] font-bold uppercase tracking-widest">
+            {isVoiceEnabled ? 'Audio Activo' : 'Audio Mudo'}
           </span>
         </button>
       </header>
@@ -125,17 +136,14 @@ const ChatInterface: React.FC = () => {
           >
             <div className={`max-w-[90%] md:max-w-[80%] rounded-2xl p-6 ${
               msg.role === 'user' 
-                ? 'bg-[#1a1a1a] border border-gray-800 shadow-xl' 
-                : 'dark-card border border-[#D4AF37]/20 shadow-2xl relative overflow-hidden'
+                ? 'bg-[#151515] border border-gray-800' 
+                : 'dark-card border border-[#D4AF37]/20 shadow-2xl relative'
             }`}>
-              {msg.role === 'model' && (
-                <div className="absolute top-0 left-0 w-1 h-full gold-bg opacity-30"></div>
-              )}
-              <div className="prose prose-invert prose-gold max-w-none">
+              <div className="prose prose-invert max-w-none">
                 {msg.text.split('\n').map((line, i) => {
-                  const isVerse = line.includes(':') || /^[0-9]/.test(line);
+                  const isVerse = line.match(/[0-9]+:[0-9]+/);
                   return (
-                    <p key={i} className={`mb-3 ${isVerse ? 'italic gold-text font-serif text-lg border-l-2 border-[#D4AF37]/30 pl-4' : 'text-gray-200 leading-relaxed'}`}>
+                    <p key={i} className={`mb-3 ${isVerse ? 'italic gold-text font-serif text-lg leading-relaxed' : 'text-gray-200 leading-relaxed'}`}>
                       {line}
                     </p>
                   );
@@ -148,52 +156,54 @@ const ChatInterface: React.FC = () => {
                   autoPlay={isVoiceEnabled && idx === messages.length - 1} 
                 />
               )}
-              
-              <span className="text-[10px] text-gray-500 mt-4 block opacity-50 uppercase tracking-widest font-bold">
-                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
             </div>
           </div>
         ))}
+
         {isLoading && (
-          <div className="flex justify-start">
-            <div className="dark-card border border-[#D4AF37]/20 rounded-2xl p-5 flex items-center space-x-3">
-              <div className="flex space-x-1.5">
-                <div className="w-2.5 h-2.5 gold-bg rounded-full animate-bounce"></div>
-                <div className="w-2.5 h-2.5 gold-bg rounded-full animate-bounce [animation-delay:-.3s]"></div>
-                <div className="w-2.5 h-2.5 gold-bg rounded-full animate-bounce [animation-delay:-.5s]"></div>
-              </div>
-              <span className="text-sm gold-text font-serif italic tracking-wide">Escudriñando las Escrituras...</span>
+          <div className="flex justify-start animate-pulse">
+            <div className="dark-card border border-[#D4AF37]/10 rounded-2xl p-4">
+              <span className="text-xs gold-text italic">Buscando sabiduría en las Escrituras...</span>
             </div>
+          </div>
+        )}
+
+        {hasError && (
+          <div className="flex justify-center p-4">
+            <button 
+              onClick={handleSendMessage}
+              className="text-xs gold-text border border-[#D4AF37]/30 px-4 py-2 rounded-full hover:bg-[#D4AF37]/10 transition-colors uppercase tracking-widest font-bold"
+            >
+              Reintentar Conexión Espiritual
+            </button>
           </div>
         )}
       </div>
 
       {/* Input */}
-      <div className="p-6 border-t border-[#D4AF37]/10 bg-[#0a0a0a] shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
+      <div className="p-6 border-t border-[#D4AF37]/10 bg-[#0a0a0a]">
         <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex space-x-3">
           <input
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="Escribe tu reflexión o duda bíblica..."
-            className="flex-1 bg-[#151515] border border-gray-800 rounded-full px-7 py-4 focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all text-gray-200 shadow-inner"
+            disabled={isLoading}
+            placeholder="Haz una pregunta o pide un consejo bíblico..."
+            className="flex-1 bg-[#111] border border-gray-800 rounded-full px-6 py-4 focus:outline-none focus:border-[#D4AF37] text-gray-200 placeholder-gray-600 shadow-inner disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={isLoading}
-            className="w-14 h-14 rounded-full gold-gradient flex items-center justify-center text-black shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
+            disabled={isLoading || !inputText.trim()}
+            className="w-14 h-14 rounded-full gold-gradient flex items-center justify-center text-black shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-30"
           >
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
             </svg>
           </button>
         </form>
-        <div className="flex justify-center items-center space-x-4 mt-3">
-          <p className="text-[10px] text-gray-600 uppercase tracking-[0.2em] font-bold">
-            La Biblia es lámpara a mis pies
-          </p>
-        </div>
+        <p className="text-[9px] text-center text-gray-700 mt-4 uppercase tracking-[0.3em] font-black">
+          "Lámpara es a mis pies tu palabra, y lumbrera a mi camino"
+        </p>
       </div>
     </div>
   );
