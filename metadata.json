@@ -1,0 +1,7 @@
+{
+  "name": "Siervo de Dios",
+  "description": "Una aplicación cristiana interactiva diseñada para acompañar, enseñar e interactuar mediante la Santa Biblia, brindando paz y sabiduría espiritual.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
